@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum ChatMessageType { text, task }
 
@@ -22,10 +23,31 @@ class _ChatViewState extends State<ChatView> {
   String? _userId;
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userId', userId);
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUserId = prefs.getString('userId');
+    if (savedUserId != null) {
+      setState(() {
+        _userId = savedUserId;
+      });
+    }
   }
 
   void _handleSubmitted(String text) async {
@@ -55,8 +77,7 @@ class _ChatViewState extends State<ChatView> {
       final headers = {
         'X-Environment': 'development',
         'Content-Type': 'application/json',
-        if (_userId != null)
-          'cookie': 'id=$_userId', // 👈 add cookie header if _userId is set
+        if (_userId != null) 'cookie': 'id=$_userId', //
       };
 
       final response = await http.put(
@@ -70,14 +91,17 @@ class _ChatViewState extends State<ChatView> {
 
       final responseData = jsonDecode(response.body);
       if (responseData['userId'] != null) {
+        final id = responseData['userId'].toString();
         setState(() {
-          _userId = responseData['userId'].toString();
+          _userId = id;
         });
+        _saveUserId(id); //
       }
-      print(responseData);
+
+      // print(responseData);
 
       setState(() {
-        _messages.removeLast(); // remove loading dots
+        _messages.removeLast();
         _isResponding = false;
 
         if (responseData['task'] != null) {
