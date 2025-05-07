@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-
 enum ChatMessageType { text, task }
 
 class ChatView extends StatefulWidget {
@@ -20,6 +19,7 @@ class _ChatViewState extends State<ChatView> {
   final ScrollController _scrollController = ScrollController();
   bool _isComposing = false;
   bool _isResponding = false;
+  String? _userId;
 
   @override
   void dispose() {
@@ -31,31 +31,50 @@ class _ChatViewState extends State<ChatView> {
   void _handleSubmitted(String text) async {
     if (text.isEmpty || _isResponding) return;
 
-     _textController.clear();
+    _textController.clear();
 
     setState(() {
       _isComposing = false;
       _isResponding = true;
-      _messages.add(ChatMessage(text: text, isMe: true, type: ChatMessageType.text));
-      _messages.add(ChatMessage(text: '...', isMe: false, isLoading: true, type: ChatMessageType.text));
+      _messages.add(
+        ChatMessage(text: text, isMe: true, type: ChatMessageType.text),
+      );
+      _messages.add(
+        ChatMessage(
+          text: '...',
+          isMe: false,
+          isLoading: true,
+          type: ChatMessageType.text,
+        ),
+      );
     });
 
     _scrollToBottom();
 
     try {
+      final headers = {
+        'X-Environment': 'development',
+        'Content-Type': 'application/json',
+        if (_userId != null)
+          'cookie': 'id=$_userId', // 👈 add cookie header if _userId is set
+      };
+
       final response = await http.put(
         Uri.parse('https://api.worklyn.com/konsul/assistant.chat'),
-        headers: {
-          'X-Environment': 'development',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: jsonEncode({
           "message": text,
-          "source": {"id": "1", "deviceId": 1}
+          "source": {"id": "1", "deviceId": 1},
         }),
       );
 
       final responseData = jsonDecode(response.body);
+      if (responseData['userId'] != null) {
+        setState(() {
+          _userId = responseData['userId'].toString();
+        });
+      }
+      print(responseData);
 
       setState(() {
         _messages.removeLast(); // remove loading dots
@@ -63,30 +82,43 @@ class _ChatViewState extends State<ChatView> {
 
         if (responseData['task'] != null) {
           final taskData = responseData['task'];
-          _messages.add(ChatMessage(
-            text: responseData['message'] ?? '',
-            isMe: false,
-            type: ChatMessageType.task,
-            task: TaskData(
-              id: taskData['id'],
-              title: taskData['title'],
-              dueDate: taskData['dueDate'] != null ? DateTime.parse(taskData['dueDate']) : null,
-              completed: taskData['completed'] ?? false,
+          _messages.add(
+            ChatMessage(
+              text: responseData['message'] ?? '',
+              isMe: false,
+              type: ChatMessageType.task,
+              task: TaskData(
+                id: taskData['id'],
+                title: taskData['title'],
+                dueDate:
+                    taskData['dueDate'] != null
+                        ? DateTime.parse(taskData['dueDate'])
+                        : null,
+                completed: taskData['completed'] ?? false,
+              ),
             ),
-          ));
+          );
         } else {
-          _messages.add(ChatMessage(
-            text: responseData['message'] ?? 'No response',
-            isMe: false,
-            type: ChatMessageType.text,
-          ));
+          _messages.add(
+            ChatMessage(
+              text: responseData['message'] ?? 'No response',
+              isMe: false,
+              type: ChatMessageType.text,
+            ),
+          );
         }
       });
     } catch (e) {
       setState(() {
         _messages.removeLast();
         _isResponding = false;
-        _messages.add(ChatMessage(text: 'Error: $e', isMe: false, type: ChatMessageType.text));
+        _messages.add(
+          ChatMessage(
+            text: 'Error: $e',
+            isMe: false,
+            type: ChatMessageType.text,
+          ),
+        );
       });
     }
 
@@ -108,35 +140,35 @@ class _ChatViewState extends State<ChatView> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Container(
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 40,
-              child: const Text(
-                "Chat",
-                style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 40,
+                child: const Text(
+                  "Chat",
+                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: EdgeInsets.all(8.0),
-                itemCount: _messages.length,
-                itemBuilder: (_, index) {
-                  final message = _messages[index];
-                  return _buildMessage(message);
-                },
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.all(8.0),
+                  itemCount: _messages.length,
+                  itemBuilder: (_, index) {
+                    final message = _messages[index];
+                    return _buildMessage(message);
+                  },
+                ),
               ),
-            ),
-            _buildMessageComposer(),
-          ],
+              _buildMessageComposer(),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -160,41 +192,46 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildTextMessage(ChatMessage message) {
-  final isMe = message.isMe;
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4.0),
-    child: Column(
-      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: isMe ? Color(0xFFE7F5F9) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
+    final isMe = message.isMe;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isMe ? Color(0xFFE7F5F9) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Linkify(
+              onOpen: (link) async {
+                final url = Uri.parse(link.url);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not launch ${link.url}')),
+                  );
+                }
+              },
+              text: message.text,
+              style: TextStyle(color: Colors.black, fontSize: 16),
+              linkStyle: TextStyle(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+              ),
+              options: LinkifyOptions(humanize: false),
+            ),
           ),
-          child: Linkify(
-            onOpen: (link) async {
-              final url = Uri.parse(link.url);
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Could not launch ${link.url}')),
-                );
-              }
-            },
-            text: message.text,
-            style: TextStyle(color: Colors.black, fontSize: 16),
-            linkStyle: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-            options: LinkifyOptions(humanize: false),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
+        ],
+      ),
+    );
+  }
 
   Widget _buildTaskMessage(TaskData task) {
     return InkWell(
@@ -224,7 +261,8 @@ class _ChatViewState extends State<ChatView> {
                     task.title,
                     style: TextStyle(
                       fontSize: 16,
-                      decoration: task.completed ? TextDecoration.lineThrough : null,
+                      decoration:
+                          task.completed ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   SizedBox(height: 4),
@@ -233,7 +271,9 @@ class _ChatViewState extends State<ChatView> {
                       Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                       SizedBox(width: 4),
                       Text(
-                        task.dueDate != null ? _formatDate(task.dueDate!) : "Today",
+                        task.dueDate != null
+                            ? _formatDate(task.dueDate!)
+                            : "Today",
                         style: TextStyle(color: Colors.grey),
                       ),
                     ],
@@ -271,38 +311,48 @@ class _ChatViewState extends State<ChatView> {
   void _showTaskDetails(TaskData task) {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(task.title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Row(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder:
+          (_) => Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.calendar_today, size: 18),
-                SizedBox(width: 8),
-                Text(task.dueDate != null ? _formatDate(task.dueDate!) : "Today"),
+                Text(
+                  task.title,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      task.dueDate != null
+                          ? _formatDate(task.dueDate!)
+                          : "Today",
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Text("Task ID: ${task.id}"),
+                SizedBox(height: 8),
+                Text("Completed: ${task.completed ? 'Yes' : 'No'}"),
+                SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Close'),
+                ),
               ],
             ),
-            SizedBox(height: 16),
-            Text("Task ID: ${task.id}"),
-            SizedBox(height: 8),
-            Text("Completed: ${task.completed ? 'Yes' : 'No'}"),
-            SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
-    Widget _buildMessageComposer() {
+  Widget _buildMessageComposer() {
     return Row(
       children: [
         Expanded(
@@ -355,24 +405,32 @@ class _ChatViewState extends State<ChatView> {
   }
 }
 
+String _formatDate(DateTime date) {
+  return "${_getWeekday(date.weekday)}, ${date.day} ${_getMonth(date.month)}";
+}
 
-  String _formatDate(DateTime date) {
-    return "${_getWeekday(date.weekday)}, ${date.day} ${_getMonth(date.month)}";
-  }
+String _getWeekday(int weekday) {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return days[weekday - 1];
+}
 
-  String _getWeekday(int weekday) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[weekday - 1];
-  }
-
-  String _getMonth(int month) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return months[month - 1];
-  }
-
+String _getMonth(int month) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return months[month - 1];
+}
 
 class ChatMessage {
   final String text;
