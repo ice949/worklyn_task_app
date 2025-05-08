@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:worklyn_task_app/views/chats/chat.dart';
-import 'package:worklyn_task_app/views/settings/settings.dart';
-import 'package:worklyn_task_app/views/tasks/task.dart';
+import 'package:worklyn_task_app/views/chat.dart';
+import 'package:worklyn_task_app/views/settings.dart';
+import 'package:worklyn_task_app/views/tasks.dart';
 
 class AppContainer extends StatefulWidget {
   const AppContainer({super.key});
@@ -15,7 +15,7 @@ class _MyAppContainerState extends State<AppContainer> {
 
   static const List<Widget> _pages = <Widget>[
     ChatView(),
-    TaskView(),
+    TasksView(),
     SettingsView(),
   ];
 

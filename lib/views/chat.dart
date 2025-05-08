@@ -77,8 +77,11 @@ class _ChatViewState extends State<ChatView> {
       final headers = {
         'X-Environment': 'development',
         'Content-Type': 'application/json',
-        if (_userId != null) 'cookie': 'id=$_userId', //
+        if (_userId != null) 'cookie': 'id=$_userId',
+        
       };
+
+      print(_userId);
 
       final response = await http.put(
         Uri.parse('https://api.worklyn.com/konsul/assistant.chat'),
@@ -89,13 +92,15 @@ class _ChatViewState extends State<ChatView> {
         }),
       );
 
+      print(response);
+
       final responseData = jsonDecode(response.body);
       if (responseData['userId'] != null) {
         final id = responseData['userId'].toString();
         setState(() {
           _userId = id;
         });
-        _saveUserId(id); //
+        _saveUserId(id); 
       }
 
       // print(responseData);
@@ -381,7 +386,7 @@ class _ChatViewState extends State<ChatView> {
       children: [
         Expanded(
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12),
+            padding: EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: Color(0xFFEAEDED),
               borderRadius: BorderRadius.circular(24),
@@ -392,7 +397,7 @@ class _ChatViewState extends State<ChatView> {
                 hintText: 'What can I do for you?',
                 hintStyle: TextStyle(color: Color(0xFFA2A2A6)),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
               ),
               onChanged: (text) {
                 setState(() {
@@ -408,7 +413,7 @@ class _ChatViewState extends State<ChatView> {
             ? GestureDetector(
               onTap: () => _handleSubmitted(_textController.text),
               child: Container(
-                padding: EdgeInsets.all(10),
+                padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Color(0xFF1397C1),
                   shape: BoxShape.circle,
@@ -417,7 +422,7 @@ class _ChatViewState extends State<ChatView> {
               ),
             )
             : Container(
-              padding: EdgeInsets.all(10),
+              padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Color.fromARGB(255, 167, 219, 235),
                 shape: BoxShape.circle,
