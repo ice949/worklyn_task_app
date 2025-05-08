@@ -494,7 +494,7 @@ class _ChatViewState extends State<ChatView> {
       body: Container(
         color: Colors.white,
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,7 +687,7 @@ Widget _buildTaskList() {
       children: [
         Expanded(
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: 15),
             decoration: BoxDecoration(
               color: Color(0xFFEAEDED),
               borderRadius: BorderRadius.circular(24),
@@ -768,7 +768,7 @@ class ChatMessage {
   final bool isLoading;
   final ChatMessageType type;
   final TaskData? task;
-  final List<TaskData>? taskList; // 💥 ADD THIS FIELD
+  final List<TaskData>? taskList; 
 
   ChatMessage({
     required this.text,
@@ -776,7 +776,7 @@ class ChatMessage {
     this.isLoading = false,
     this.type = ChatMessageType.text,
     this.task,
-    this.taskList, // 💥 ADD THIS
+    this.taskList, 
   });
 }
 
