@@ -81,8 +81,6 @@ class _ChatViewState extends State<ChatView> {
         
       };
 
-      print(_userId);
-
       final response = await http.put(
         Uri.parse('https://api.worklyn.com/konsul/assistant.chat'),
         headers: headers,
@@ -91,8 +89,6 @@ class _ChatViewState extends State<ChatView> {
           "source": {"id": "1", "deviceId": 1},
         }),
       );
-
-      print(response);
 
       final responseData = jsonDecode(response.body);
       if (responseData['userId'] != null) {
@@ -103,31 +99,13 @@ class _ChatViewState extends State<ChatView> {
         _saveUserId(id); 
       }
 
-      // print(responseData);
+      print(responseData);
 
       setState(() {
         _messages.removeLast();
         _isResponding = false;
 
-        if (responseData['task'] != null) {
-          final taskData = responseData['task'];
-          _messages.add(
-            ChatMessage(
-              text: responseData['message'] ?? '',
-              isMe: false,
-              type: ChatMessageType.task,
-              task: TaskData(
-                id: taskData['id'],
-                title: taskData['title'],
-                dueDate:
-                    taskData['dueDate'] != null
-                        ? DateTime.parse(taskData['dueDate'])
-                        : null,
-                completed: taskData['completed'] ?? false,
-              ),
-            ),
-          );
-        } else {
+        
           _messages.add(
             ChatMessage(
               text: responseData['message'] ?? 'No response',
@@ -135,7 +113,6 @@ class _ChatViewState extends State<ChatView> {
               type: ChatMessageType.text,
             ),
           );
-        }
       });
     } catch (e) {
       setState(() {
@@ -212,11 +189,7 @@ class _ChatViewState extends State<ChatView> {
         ),
       );
     }
-
-    if (message.type == ChatMessageType.task && message.task != null) {
-      return _buildTaskMessage(message.task!);
-    }
-
+    
     return _buildTextMessage(message);
   }
 
@@ -262,60 +235,7 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  Widget _buildTaskMessage(TaskData task) {
-    return InkWell(
-      onTap: () => _showTaskDetails(task),
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 4),
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Checkbox(
-              value: task.completed,
-              onChanged: (val) {
-                setState(() {
-                  task.completed = val ?? false;
-                });
-              },
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      decoration:
-                          task.completed ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                      SizedBox(width: 4),
-                      Text(
-                        task.dueDate != null
-                            ? _formatDate(task.dueDate!)
-                            : "Today",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  
   Widget _buildTypingDots() {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -337,50 +257,7 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
-  void _showTaskDetails(TaskData task) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder:
-          (_) => Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      task.dueDate != null
-                          ? _formatDate(task.dueDate!)
-                          : "Today",
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Text("Task ID: ${task.id}"),
-                SizedBox(height: 8),
-                Text("Completed: ${task.completed ? 'Yes' : 'No'}"),
-                SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Close'),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
+  
   Widget _buildMessageComposer() {
     return Row(
       children: [
