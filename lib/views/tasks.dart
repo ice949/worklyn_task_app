@@ -1,5 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
+
 
 class TasksView extends StatefulWidget {
   const TasksView({Key? key}) : super(key: key);
@@ -15,8 +20,73 @@ class _TasksViewState extends State<TasksView> {
   @override
   void initState() {
     super.initState();
-    _loadDummyTasks();
+    // _loadDummyTasks();
+    _fetchTasksFromApi();
+
   }
+
+  void _fetchTasksFromApi() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('userId') ?? ''; // fallback if not set
+
+  if (userId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('User ID not found in local storage.')),
+    );
+    setState(() {
+      _isLoading = false;
+    });
+    return;
+  }
+
+  final url = Uri.parse('https://api.worklyn.com/konsul/actionPoints.list');
+
+  try {
+    final response = await http.get(
+      url,
+      headers: {
+        'X-Environment': 'development',
+        'Cookie': 'id=$userId',
+        'content-type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final jsonBody = json.decode(response.body);
+      final List<dynamic> points = jsonBody['data']['points'];
+
+      setState(() {
+        _isLoading = false;
+        _tasks = points.map((item) {
+          return TaskData(
+            id: item['id'] ?? '',
+            title: item['name'] ?? 'No title',
+            note: item['note'] ?? '',
+            dueDate: DateTime.tryParse(item['dueWhen'] ?? '') ?? DateTime.now(),
+            completed: item['status'] == 'DONE',
+          );
+        }).toList();
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${response.statusCode}')),
+      );
+    }
+  } catch (e) {
+    setState(() {
+      _isLoading = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to load tasks: $e')),
+    );
+  }
+}
+
+
+
 
   void _loadDummyTasks() {
     // Simulate loading from API after 3 seconds
@@ -47,14 +117,14 @@ class _TasksViewState extends State<TasksView> {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    barrierColor: Colors.black.withOpacity(0.4), // Overlay background
+    barrierColor: Colors.black.withOpacity(0.4), 
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (context) => FractionallySizedBox(
-      heightFactor: 0.9, // 90% height
+      heightFactor: 0.9, 
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -69,75 +139,110 @@ class _TasksViewState extends State<TasksView> {
               ),
             ),
             SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Edit Task',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Edit Task',
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    // Add delete functionality here
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Task deleted')),
-                    );
-                    Navigator.pop(context); // Close bottom sheet
-                  },
-                  child: Text(
-                    'Delete',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
+                  GestureDetector(
+                    onTap: () {
+                      // Add delete functionality here
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Task deleted')),
+                      );
+                      Navigator.pop(context); 
+                    },
+                    child: Text(
+                      'Delete',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: 24),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 18),
-                SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Row(
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 5,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                                value: task.completed,
+                                onChanged: (val) {
+                                  setState(() {
+                                    task.completed = val ?? false;
+                                  });
+                                },
+                                shape: CircleBorder(), 
+                              ),
+                              Text(task.title)
+                    ],
+                  ),
+                                  Container(
+                    decoration: BoxDecoration(borderRadius: BorderRadius.all(Radius.circular(25)), color: Color(0xFFEAEDED),),
+                    width: 140,
+                    padding: EdgeInsets.all(13),
+                    child: InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Row(
+                            children: [
+                              Text('Clicked date: ${_formatDate(task.dueDate)}'),
+                            ],
+                          )),
+                        );
+                      },
+                      child: Row(
+                        spacing: 8,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text('Clicked date: ${_formatDate(task.dueDate)}'),
+                          Icon(Icons.calendar_today, size: 18, color: Colors.green,),
+                          Text(
+                            _formatDate(task.dueDate),
+                            style: TextStyle(
+                              color: Colors.green,
+                            ),
+                          ),
                         ],
-                      )),
-                    );
-                  },
-                  child: Text(
-                    _formatDate(task.dueDate),
-                    style: TextStyle(
-                      color: Colors.blue,
-                      decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+
             SizedBox(height: 16),
-            Text("Task ID: ${task.id}"),
-            SizedBox(height: 8),
-            Text("Completed: ${task.completed ? 'Yes' : 'No'}"),
-            SizedBox(height: 8),
-            Text("Note: ${task.note}"),
+            Container(width: double.infinity, height: 1, color: Color.fromARGB(255, 210, 213, 213),),
+           Row(
+            spacing: 10,
+            children: [
+              Icon(Icons.add),
+              Text("Add subtask"),
+            ],
+           ),
             Spacer(),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
-              style: ElevatedButton.styleFrom(
+              onPressed: () => Navigator.pop(context),style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 48),
               ),
+              child: Text('Close'),
+              
             ),
           ],
         ),
@@ -211,11 +316,11 @@ class _TasksViewState extends State<TasksView> {
                               Row(
                                 children: [
                                   Icon(Icons.calendar_today,
-                                      size: 14, color: Colors.grey),
+                                      size: 14, color: Colors.green),
                                   SizedBox(width: 4),
                                   Text(
                                     _formatDate(task.dueDate),
-                                    style: TextStyle(color: Colors.grey),
+                                    style: TextStyle(color: Colors.green),
                                   ), 
                                 ],
                               ),
