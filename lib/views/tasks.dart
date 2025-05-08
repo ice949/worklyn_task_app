@@ -18,7 +18,6 @@ class _TasksViewState extends State<TasksView> {
   @override
   void initState() {
     super.initState();
-    // _loadDummyTasks();
     _fetchTasksFromApi();
   }
 
@@ -83,31 +82,6 @@ class _TasksViewState extends State<TasksView> {
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to load tasks: $e')));
     }
-  }
-
-  void _loadDummyTasks() {
-    // Simulate loading from API after 3 seconds
-    Timer(Duration(seconds: 3), () {
-      setState(() {
-        _isLoading = false;
-        _tasks = [
-          TaskData(
-            id: '1',
-            title: 'Sample Task',
-            note: 'Sample note for the task.',
-            dueDate: DateTime.now().add(Duration(days: 1)),
-            completed: false,
-          ),
-          TaskData(
-            id: '2',
-            title: 'Another Task',
-            note: 'Another note.',
-            dueDate: DateTime.now().add(Duration(days: 2)),
-            completed: true,
-          ),
-        ];
-      });
-    });
   }
 
   void _showTaskDetails(TaskData task) {
@@ -200,7 +174,7 @@ class _TasksViewState extends State<TasksView> {
                               color: Color(0xFFEAEDED),
                             ),
                             width: 140,
-                            padding: EdgeInsets.all(13),
+                            padding: EdgeInsets.symmetric(horizontal: 13, vertical: 6),
                             child: InkWell(
                               onTap: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -297,70 +271,93 @@ class _TasksViewState extends State<TasksView> {
   Widget build(BuildContext context) {
     return Scaffold(
       body:
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                padding: EdgeInsets.all(12),
-                itemCount: _tasks.length,
-                itemBuilder: (_, index) {
-                  final task = _tasks[index];
-                  return InkWell(
-                    onTap: () => _showTaskDetails(task),
-                    child: Container(
-                      margin: EdgeInsets.symmetric(vertical: 6),
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: task.completed,
-                            onChanged: (val) {
-                              setState(() {
-                                task.completed = val ?? false;
-                              });
-                            },
-                            shape: CircleBorder(),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  task.title,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    decoration:
-                                        task.completed
-                                            ? TextDecoration.lineThrough
-                                            : null,
+          Padding(
+            padding: const EdgeInsets.all(15.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 15,
+              children: [
+                SizedBox(
+                  height: 40,
+                  child: const Text(
+                    "Tasks",
+                    style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Container(
+                  child: _isLoading
+                      ? Center(child: CircularProgressIndicator())
+                      : Expanded(
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: _tasks.length,
+                          itemBuilder: (_, index) {
+                            final task = _tasks[index];
+                            return InkWell(
+                              onTap: () => _showTaskDetails(task),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Checkbox(
+                                          value: task.completed,
+                                          onChanged: (val) {
+                                            setState(() {
+                                              task.completed = val ?? false;
+                                            });
+                                          },
+                                          shape: CircleBorder(),
+                                        ),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                task.title,
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  decoration:
+                                                      task.completed
+                                                          ? TextDecoration.lineThrough
+                                                          : null,
+                                                ),
+                                              ),
+                                              SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.calendar_today,
+                                                    size: 14,
+                                                    color: Colors.green,
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    _formatDate(task.dueDate),
+                                                    style: TextStyle(color: Colors.green),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      size: 14,
-                                      color: Colors.green,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      _formatDate(task.dueDate),
-                                      style: TextStyle(color: Colors.green),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                                  SizedBox(height: 12,),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                ),
+              ],
+            ),
+          ),
     );
   }
 }
