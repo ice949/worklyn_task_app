@@ -1,0 +1,21 @@
+// typing_dots_widget.dart
+import 'package:flutter/material.dart';
+import 'dot.dart'; 
+
+class TypingDotsWidget extends StatelessWidget {
+  const TypingDotsWidget({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: const [
+        DotWidget(),
+        SizedBox(width: 4),
+        DotWidget(),
+        SizedBox(width: 4),
+        DotWidget(),
+      ],
+    );
+  }
+}
