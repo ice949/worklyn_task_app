@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:html/parser.dart' as htmlParser;
 import 'package:worklyn_task_app/models/chat_message.dart';
 import 'package:worklyn_task_app/models/task_data.dart';
+import 'package:worklyn_task_app/services/api/chat_api.dart';
+import 'package:worklyn_task_app/services/storage/local_storage.dart';
+import 'package:worklyn_task_app/utils/html_parser.dart';
 import 'package:worklyn_task_app/views/widgets/message_composer.dart';
 import 'package:worklyn_task_app/views/widgets/show_edit_task_modal.dart';
 import 'package:worklyn_task_app/views/widgets/task_list.dart';
@@ -37,6 +37,7 @@ class _ChatViewState extends State<ChatView> {
     _loadUserId();
   }
 
+
   void _onDateSelected(DateTime day, DateTime focusedDay) {
     setState(() {
       selData = day;
@@ -50,20 +51,8 @@ class _ChatViewState extends State<ChatView> {
     super.dispose();
   }
 
-  void _showTaskDetails(TaskData task) {
-    showEditTaskModal(
-      context: context,
-      task: task,
-      selData: selData,
-      onDateSelected: _onDateSelected,
-    );
-  }
 
-  Future<void> _saveUserId(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userId', userId);
-  }
-
+  // Get use from local storage
   Future<void> _loadUserId() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUserId = prefs.getString('userId');
@@ -74,126 +63,86 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
+// Open Bottom Sheet with task details
+  void _showTaskDetails(TaskData task) {
+    showEditTaskModal(
+      context: context,
+      task: task,
+      selData: selData,
+      onDateSelected: _onDateSelected,
+    );
+  }
+
 
   void _handleSubmitted(String text) async {
-    if (text.isEmpty || _isResponding) return;
+  if (text.isEmpty || _isResponding) return;
 
-    _textController.clear();
+  _prepareUserMessage(text);
+  _scrollToBottom();
 
-    setState(() {
-      _isComposing = false;
-      _isResponding = true;
-      _messages.add(
-        ChatMessage(text: text, isMe: true, type: ChatMessageType.text),
-      );
-      _messages.add(
-        ChatMessage(
-          text: '...',
-          isMe: false,
-          isLoading: true,
-          type: ChatMessageType.text,
-        ),
-      );
-    });
+  try {
+    final responseData = await ChatApiService.sendMessage(text: text, userId: _userId);
 
-    _scrollToBottom();
+    await _updateUserIdIfNeeded(responseData);
 
-    try {
-      final headers = {
-        'X-Environment': 'development',
-        'Content-Type': 'application/json',
-        if (_userId != null) 'cookie': 'id=$_userId',
-      };
+    final htmlMessage = responseData['html_message'] ?? '';
+    final tasks = HtmlParserUtil.parseTasks(htmlMessage);
 
-      final response = await http.put(
-        Uri.parse('https://api.worklyn.com/konsul/assistant.chat'),
-        headers: headers,
-        body: jsonEncode({
-          "message": text,
-          "source": {"id": "1", "deviceId": 1},
-        }),
-      );
-
-      final responseData = jsonDecode(response.body);
-
-      if (responseData['userId'] != null) {
-        final id = responseData['userId'].toString();
-        setState(() {
-          _userId = id;
-        });
-        _saveUserId(id);
-      }
-
-      // parse html_message
-      final htmlMessage = responseData['html_message'] ?? '';
-      final document = htmlParser.parse(htmlMessage);
-      final olElement = document.querySelector('ol');
-
-      setState(() {
-        _messages.removeLast();
-        _isResponding = false;
-
-        if (olElement != null) {
-          final taskElements = olElement.querySelectorAll('li');
-          print(taskElements);
-          List<TaskData> tasks = [];
-
-          for (int i = 0; i < taskElements.length; i++) {
-            final li = taskElements[i];
-            final title = li?.text.trim() ?? 'Untitled Task';
-
-            if (title != "Untitled Task") {
-              _tasks.add(TaskData(id: i + 1, title: title));
-            }
-          }
-
-          _messages.add(
-            ChatMessage(
-              text: responseData['message'] ?? '',
-              isMe: false,
-              type: ChatMessageType.task,
-              task: null, 
-              taskList: tasks, 
-            ),
-          );
-        } else {
-          final htmlMessage = responseData['html_message'] ?? '';
-          if (htmlMessage.contains('<ol>')) {
-
-            _messages.add(
-              ChatMessage(
-                text: 'Here are your tasks:',
-                isMe: false,
-                type: ChatMessageType.task,
-              ),
-            );
-          } else {
-            _messages.add(
-              ChatMessage(
-                text: responseData['message'] ?? 'No response',
-                isMe: false,
-                type: ChatMessageType.text,
-              ),
-            );
-          }
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _messages.removeLast();
-        _isResponding = false;
-        _messages.add(
-          ChatMessage(
-            text: 'Error: $e',
-            isMe: false,
-            type: ChatMessageType.text,
-          ),
-        );
-      });
-    }
-
-    _scrollToBottom();
+    _handleBotResponse(
+      message: responseData['message'] ?? 'No response',
+      htmlMessage: htmlMessage,
+      tasks: tasks,
+    );
+  } catch (e) {
+    _handleError(e);
   }
+
+  _scrollToBottom();
+}
+
+void _prepareUserMessage(String text) {
+  _textController.clear();
+  setState(() {
+    _isComposing = false;
+    _isResponding = true;
+    _messages.add(ChatMessage(text: text, isMe: true, type: ChatMessageType.text));
+    _messages.add(ChatMessage(text: '...', isMe: false, isLoading: true, type: ChatMessageType.text));
+  });
+}
+
+Future<void> _updateUserIdIfNeeded(Map<String, dynamic> responseData) async {
+  final id = responseData['userId']?.toString();
+  if (id != null && id != _userId) {
+    setState(() => _userId = id);
+    await LocalStorageService.saveUserId(id);
+  }
+}
+
+void _handleBotResponse({required String message, required String htmlMessage, required List<TaskData> tasks}) {
+  setState(() {
+    _messages.removeLast();
+    _isResponding = false;
+
+    if (tasks.isNotEmpty) {
+      _tasks.addAll(tasks);
+      _messages.add(ChatMessage(text: message, isMe: false, type: ChatMessageType.task, taskList: tasks));
+    } else if (htmlMessage.contains('<ol>')) {
+      _messages.add(ChatMessage(text: 'Here are your tasks:', isMe: false, type: ChatMessageType.task));
+    } else {
+      _messages.add(ChatMessage(text: message, isMe: false, type: ChatMessageType.text));
+    }
+  });
+}
+
+void _handleError(Object error) {
+  setState(() {
+    _messages.removeLast();
+    _isResponding = false;
+    _messages.add(ChatMessage(text: 'Error: $error', isMe: false, type: ChatMessageType.text));
+  });
+}
+
+
 
 
 

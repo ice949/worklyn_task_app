@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:worklyn_task_app/views/widgets/calendar_selector.dart';
 
 class TasksView extends StatefulWidget {
   const TasksView({Key? key}) : super(key: key);
@@ -114,9 +115,11 @@ class _TasksViewState extends State<TasksView> {
                 ),
                 child:
                     showCalendar
-                        ? _buildCalendarView(
-                          context,
-                          () => setModalState(() => showCalendar = false),
+                        ? CalendarSelector(
+                          selectedDate: selData,
+                          onDaySelected: _onDateSelected,
+                          onBack:
+                              () => setModalState(() => showCalendar = false),
                         )
                         : _buildTaskDetailsView(
                           context,
@@ -255,71 +258,6 @@ class _TasksViewState extends State<TasksView> {
     );
   }
 
-  Widget _buildCalendarView(
-    BuildContext context,
-    VoidCallback backToTaskDetails,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: backToTaskDetails,
-                child: Row(
-                  children: [
-                    Icon(Icons.arrow_back, color: Color(0xFF1397C1)),
-                    Text(
-                      'Edit Task',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1397C1),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 25),
-              Center(
-                child: Text(
-                  'Choose Date',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 24),
-        Expanded(
-          child: Center(
-            child: TableCalendar(
-              headerStyle: HeaderStyle(formatButtonVisible: false),
-              selectedDayPredicate: (day) => isSameDay(day, selData),
-              availableGestures: AvailableGestures.all,
-              firstDay: DateTime.utc(2010, 10, 16),
-              lastDay: DateTime.utc(2030, 3, 14),
-              focusedDay: selData,
-              onDaySelected: _onDateSelected,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   String _formatDate(DateTime date) {
     return "${_getWeekday(date.weekday)}, ${date.day} ${_getMonth(date.month)}";
