@@ -37,7 +37,7 @@ class CalendarViewWidget extends StatelessWidget {
                 onTap: backToTaskDetails,
                 child: Row(
                   children: const [
-                    Icon(Icons.arrow_back, color: Color(0xFF1397C1)),
+                    Icon(Icons.chevron_left, color: Color(0xFF1397C1)),
                     SizedBox(width: 4),
                     Text(
                       'Edit Task',
